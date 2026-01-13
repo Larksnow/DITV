@@ -58,7 +58,8 @@ public class Swordfish : BaseFish
     
     public override void OnRhythmInput()
     {
-        if (isPunished) return;
+        // 剑鱼的节拍输入由PlayerController处理时机，这里直接执行动作
+        // if (isDashing) return;
         
         // 加速
         AccelerateOnBeat();
@@ -98,7 +99,7 @@ public class Swordfish : BaseFish
     /// </summary>
     public void TryParry()
     {
-        if (!hasParryOpportunity || isPunished || isParrying) return;
+        if (!hasParryOpportunity || isParrying) return;
         
         // 检查节拍时机
         if (Conductor.Instance.CheckInputTiming())
@@ -107,7 +108,8 @@ public class Swordfish : BaseFish
         }
         else
         {
-            ApplyMissPenalty();
+            // 错拍会由PlayerController处理，这里不需要额外处理
+            Debug.Log("Parry timing missed - handled by PlayerController");
         }
     }
     

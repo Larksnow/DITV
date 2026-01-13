@@ -20,10 +20,6 @@ public abstract class BaseFish : MonoBehaviour, IBeatListener
     private int invincibleBeatCount = 0;
     private int invincibleDuration = 1; // 一拍的无敌时间
     
-    // 惩罚相关
-    protected bool isPunished = false;
-    private int punishedBeat = -1;
-    
     protected virtual void Awake()
     {
         // 获取组件
@@ -60,11 +56,8 @@ public abstract class BaseFish : MonoBehaviour, IBeatListener
     
     protected virtual void Update()
     {
-        // 检查惩罚状态
-        CheckPunishmentRelease();
-        
         // 处理自由移动（只有玩家且允许自由移动的角色）
-        if (isPlayer && movementController.CanFreeMove && !isPunished)
+        if (isPlayer && movementController.CanFreeMove)
         {
             HandleFreeMovement();
         }
@@ -101,66 +94,6 @@ public abstract class BaseFish : MonoBehaviour, IBeatListener
     /// 处理节拍输入 - 每个角色实现不同的逻辑
     /// </summary>
     public abstract void OnRhythmInput();
-    
-    /// <summary>
-    /// 检查输入时机并执行动作
-    /// </summary>
-    protected bool TryExecuteRhythmAction()
-    {
-        if (isPunished) return false;
-        
-        if (Conductor.Instance.CheckInputTiming())
-        {
-            OnRhythmInput();
-            return true;
-        }
-        else
-        {
-            ApplyMissPenalty();
-            return false;
-        }
-    }
-    
-    /// <summary>
-    /// 应用错拍惩罚
-    /// </summary>
-    protected void ApplyMissPenalty()
-    {
-        isPunished = true;
-        punishedBeat = Mathf.RoundToInt(Conductor.Instance.songPositionInBeats);
-        
-        // 视觉反馈
-        if (spriteRenderer != null)
-        {
-            spriteRenderer.color = Color.red;
-        }
-        
-        Debug.Log($"{gameObject.name} missed beat, punished until next beat");
-    }
-    
-    /// <summary>
-    /// 检查是否应该解除惩罚
-    /// </summary>
-    private void CheckPunishmentRelease()
-    {
-        if (!isPunished) return;
-        
-        int nextBeat = punishedBeat + 1;
-        float nextBeatTime = nextBeat;
-        float earlyWindowStart = nextBeatTime - (Conductor.Instance.inputThreshold / (60f / Conductor.Instance.bpm));
-        
-        if (Conductor.Instance.songPositionInBeats >= earlyWindowStart)
-        {
-            isPunished = false;
-            punishedBeat = -1;
-            
-            // 恢复视觉
-            if (spriteRenderer != null)
-            {
-                spriteRenderer.color = Color.white;
-            }
-        }
-    }
     
     #endregion
     
@@ -277,7 +210,6 @@ public abstract class BaseFish : MonoBehaviour, IBeatListener
     public int CurrentHealth => currentHealth;
     public int MaxHealth => maxHealth;
     public bool IsInvincible => isInvincible;
-    public bool IsPunished => isPunished;
     public bool IsPlayer => isPlayer;
     
     /// <summary>
@@ -286,6 +218,14 @@ public abstract class BaseFish : MonoBehaviour, IBeatListener
     public void SetAsPlayer(bool isPlayerControlled)
     {
         isPlayer = isPlayerControlled;
+    }
+    
+    /// <summary>
+    /// 检查是否被惩罚（通过PlayerController）
+    /// </summary>
+    protected bool IsPlayerPunished()
+    {
+        return isPlayer && PlayerController.Instance != null && PlayerController.Instance.IsPunished;
     }
     
     #endregion

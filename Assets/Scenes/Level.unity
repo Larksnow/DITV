@@ -1031,7 +1031,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1624165368}
-  - component: {fileID: 1624165367}
   - component: {fileID: 1624165370}
   m_Layer: 0
   m_Name: Player Controller
@@ -1040,21 +1039,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1624165367
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1624165366}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: aaae5973c1351a1479a58573d0d1653f, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  actionKey: 32
-  visualFeedback: {fileID: 760387964}
-  isPunished: 0
 --- !u!4 &1624165368
 Transform:
   m_ObjectHideFlags: 0
@@ -1085,8 +1069,10 @@ MonoBehaviour:
   currentFish: {fileID: 1320174982}
   actionKey: 32
   secondaryKey: 304
-  mouseCursor: {fileID: 0}
   uiCursor: {fileID: 1880674223}
+  visualFeedback: {fileID: 0}
+  showVisualFeedback: 1
+  isPunished: 0
 --- !u!1 &1880674221
 GameObject:
   m_ObjectHideFlags: 0

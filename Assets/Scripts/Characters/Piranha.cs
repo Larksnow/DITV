@@ -32,7 +32,8 @@ public class Piranha : BaseFish
     /// </summary>
     public override void OnRhythmInput()
     {
-        if (isPunished || movementController.IsMoving) return;
+        // 食人鱼的节拍输入由PlayerController处理时机，这里直接执行动作
+        if (movementController.IsMoving) return;
         
         PerformDashAttack();
     }

@@ -45,7 +45,7 @@ public class Tuna : BaseFish
     /// </summary>
     private void HandleChargeInput()
     {
-        if (isPunished || isDashing) return;
+        if (isDashing) return;
         
         // 开始蓄力
         if (Input.GetKeyDown(KeyCode.Space) && !isCharging)
@@ -80,7 +80,8 @@ public class Tuna : BaseFish
         // 检查是否在节拍上
         if (!Conductor.Instance.CheckInputTiming())
         {
-            ApplyMissPenalty();
+            // 错拍会由PlayerController处理，这里不需要额外处理
+            Debug.Log("Charge timing missed - handled by PlayerController");
             return;
         }
         
@@ -109,7 +110,8 @@ public class Tuna : BaseFish
         {
             // 错拍释放，取消蓄力
             CancelCharge();
-            ApplyMissPenalty();
+            // 错拍会由PlayerController处理，这里不需要额外处理
+            Debug.Log("Release timing missed - handled by PlayerController");
             return;
         }
         
