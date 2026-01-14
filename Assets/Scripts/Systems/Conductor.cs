@@ -89,4 +89,49 @@ public class Conductor : MonoBehaviour
 
         return timeDiff <= inputThreshold;
     }
+    
+    // --- 拍数和时间转换 ---
+    
+    /// <summary>
+    /// 将拍数转换为秒数
+    /// </summary>
+    public float BeatsToSeconds(float beats)
+    {
+        return beats * secPerBeat;
+    }
+    
+    /// <summary>
+    /// 将秒数转换为拍数
+    /// </summary>
+    public float SecondsToBeats(float seconds)
+    {
+        return seconds / secPerBeat;
+    }
+    
+    /// <summary>
+    /// 获取到下一拍的剩余时间（秒）
+    /// </summary>
+    public float GetTimeToNextBeat()
+    {
+        float currentBeat = songPositionInBeats;
+        float nextBeat = Mathf.Ceil(currentBeat);
+        float beatsRemaining = nextBeat - currentBeat;
+        return beatsRemaining * secPerBeat;
+    }
+    
+    /// <summary>
+    /// 获取当前小节（4拍为一小节）
+    /// </summary>
+    public int GetCurrentMeasure()
+    {
+        return Mathf.FloorToInt(songPositionInBeats / 4f);
+    }
+    
+    /// <summary>
+    /// 获取当前在小节中的拍数（0-3）
+    /// </summary>
+    public int GetBeatInMeasure()
+    {
+        return Mathf.FloorToInt(songPositionInBeats) % 4;
+    }
 }
