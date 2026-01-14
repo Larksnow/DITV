@@ -26,10 +26,7 @@ public class Tuna : BaseFish
         base.Awake();
         
         // 金枪鱼可以自由移动，但速度较慢
-        if (movementController is InterpolationMovement interpMovement)
-        {
-            interpMovement.SetCanFreeMove(true);
-        }
+        freeMovementSpeed = 2f;
     }
     
     protected override void Update()
@@ -53,12 +50,6 @@ public class Tuna : BaseFish
             StartCharge();
         }
         
-        // 持续蓄力
-        if (Input.GetKey(KeyCode.Space) && isCharging)
-        {
-            // 蓄力状态在OnBeat中处理
-        }
-        
         // 释放蓄力
         if (Input.GetKeyUp(KeyCode.Space) && isCharging)
         {
@@ -69,7 +60,6 @@ public class Tuna : BaseFish
     public override void OnRhythmInput()
     {
         // 金枪鱼的主要输入通过蓄力系统处理
-        // 这个方法在PlayerController中被调用，但实际逻辑在HandleChargeInput中
     }
     
     /// <summary>
@@ -77,13 +67,7 @@ public class Tuna : BaseFish
     /// </summary>
     private void StartCharge()
     {
-        // 检查是否在节拍上
-        if (!Conductor.Instance.CheckInputTiming())
-        {
-            // 错拍会由PlayerController处理，这里不需要额外处理
-            Debug.Log("Charge timing missed - handled by PlayerController");
-            return;
-        }
+        if (!Conductor.Instance.CheckInputTiming()) return;
         
         isCharging = true;
         chargeLevel = 0;
@@ -91,7 +75,6 @@ public class Tuna : BaseFish
         
         Debug.Log("Tuna started charging");
         
-        // 播放蓄力动画
         if (animator != null)
         {
             animator.SetBool("IsCharging", true);
@@ -105,20 +88,14 @@ public class Tuna : BaseFish
     {
         if (!isCharging) return;
         
-        // 检查是否在节拍上释放
         if (!Conductor.Instance.CheckInputTiming())
         {
-            // 错拍释放，取消蓄力
             CancelCharge();
-            // 错拍会由PlayerController处理，这里不需要额外处理
-            Debug.Log("Release timing missed - handled by PlayerController");
             return;
         }
         
-        // 执行冲刺攻击
         PerformChargedDash();
         
-        // 重置蓄力状态
         isCharging = false;
         chargeLevel = 0;
         chargeBeatCount = 0;
@@ -155,32 +132,26 @@ public class Tuna : BaseFish
         
         isDashing = true;
         
-        // 获取冲刺参数
         float damage = chargeDamages[chargeLevel - 1];
         float distance = chargeDistances[chargeLevel - 1];
         
-        // 计算冲刺方向和目标位置
-        Vector3 dashDirection = GetDashDirection();
+        // 使用基类的GetMouseDirection
+        Vector3 dashDirection = GetMouseDirection();
         Vector3 targetPosition = transform.position + dashDirection * distance;
         targetPosition = ClampToScreenBounds(targetPosition);
         
-        // 执行冲刺移动
         movementController.SetTargetPosition(targetPosition, chargeDuration);
-        
-        // 冲刺过程中无敌
         SetInvincible(true);
         
-        // 执行攻击检测
         StartCoroutine(DashAttackCoroutine(damage));
         
-        // 播放动画
         if (animator != null)
         {
             animator.SetTrigger("ChargedDash");
             animator.SetInteger("ChargeLevel", chargeLevel);
         }
         
-        Debug.Log($"Tuna charged dash level {chargeLevel}, damage: {damage}, distance: {distance}");
+        Debug.Log($"Tuna charged dash level {chargeLevel}");
     }
     
     /// <summary>
@@ -189,13 +160,10 @@ public class Tuna : BaseFish
     private System.Collections.IEnumerator DashAttackCoroutine(float damage)
     {
         float elapsed = 0f;
-        Vector3 startPos = transform.position;
         
         while (elapsed < chargeDuration)
         {
-            // 检测冲刺路径上的敌人
             CheckDashCollision(damage);
-            
             elapsed += Time.deltaTime;
             yield return null;
         }
@@ -227,43 +195,6 @@ public class Tuna : BaseFish
     }
     
     /// <summary>
-    /// 获取冲刺方向 - 优先使用鼠标方向
-    /// </summary>
-    private Vector3 GetDashDirection()
-    {
-        // 获取鼠标世界坐标
-        Vector3 mouseWorldPos = GetMouseWorldPosition();
-        Vector3 directionToMouse = (mouseWorldPos - transform.position).normalized;
-        
-        // 如果鼠标距离足够远，使用鼠标方向
-        float distanceToMouse = Vector3.Distance(transform.position, mouseWorldPos);
-        if (distanceToMouse > 1f)
-        {
-            return directionToMouse;
-        }
-        
-        // 否则朝向最近的敌人
-        BaseFish nearestEnemy = FindNearestEnemy();
-        if (nearestEnemy != null)
-        {
-            return (nearestEnemy.transform.position - transform.position).normalized;
-        }
-        
-        // 默认向右
-        return Vector3.right;
-    }
-    
-    /// <summary>
-    /// 获取鼠标世界坐标
-    /// </summary>
-    private Vector3 GetMouseWorldPosition()
-    {
-        Vector3 mouseScreenPos = Input.mousePosition;
-        mouseScreenPos.z = Camera.main.transform.position.z * -1;
-        return Camera.main.ScreenToWorldPoint(mouseScreenPos);
-    }
-    
-    /// <summary>
     /// 找到最近的敌人
     /// </summary>
     private BaseFish FindNearestEnemy()
@@ -286,21 +217,6 @@ public class Tuna : BaseFish
         }
         
         return nearest;
-    }
-    
-    /// <summary>
-    /// 限制位置在屏幕边界内
-    /// </summary>
-    private Vector3 ClampToScreenBounds(Vector3 position)
-    {
-        Camera cam = Camera.main;
-        if (cam != null)
-        {
-            Vector3 screenBounds = cam.ScreenToWorldPoint(new Vector3(Screen.width, Screen.height, cam.transform.position.z));
-            position.x = Mathf.Clamp(position.x, -screenBounds.x + 1f, screenBounds.x - 1f);
-            position.y = Mathf.Clamp(position.y, -screenBounds.y + 1f, screenBounds.y - 1f);
-        }
-        return position;
     }
     
     protected override void OnBeatCustom(int beatCount)
@@ -337,7 +253,7 @@ public class Tuna : BaseFish
         if (chargeLevel > 0)
         {
             Gizmos.color = Color.blue;
-            Vector3 dashDirection = GetDashDirection();
+            Vector3 dashDirection = GetMouseDirection();
             float distance = chargeDistances[chargeLevel - 1];
             Gizmos.DrawRay(transform.position, dashDirection * distance);
         }

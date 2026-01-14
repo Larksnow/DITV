@@ -32,11 +32,8 @@ public class Swordfish : BaseFish
     {
         base.Awake();
         
-        // 剑鱼不能自由移动，必须通过加速系统移动
-        if (movementController is InterpolationMovement interpMovement)
-        {
-            interpMovement.SetCanFreeMove(false);
-        }
+        // 剑鱼默认不能自由移动（必须通过加速系统）
+        canFreeMove = false;
     }
     
     protected override void Update()
@@ -58,10 +55,6 @@ public class Swordfish : BaseFish
     
     public override void OnRhythmInput()
     {
-        // 剑鱼的节拍输入由PlayerController处理时机，这里直接执行动作
-        // if (isDashing) return;
-        
-        // 加速
         AccelerateOnBeat();
     }
     
@@ -75,13 +68,8 @@ public class Swordfish : BaseFish
             currentSpeed++;
             Debug.Log($"Swordfish speed: {currentSpeed}/{maxSpeed}");
             
-            // 更新移动方向
-            UpdateMovementDirection();
-            
-            // 执行移动
             PerformMovement();
             
-            // 播放动画
             if (animator != null)
             {
                 animator.SetInteger("Speed", currentSpeed);
@@ -89,7 +77,6 @@ public class Swordfish : BaseFish
         }
         else
         {
-            // 已达最高速，继续移动
             PerformMovement();
         }
     }
@@ -101,15 +88,9 @@ public class Swordfish : BaseFish
     {
         if (!hasParryOpportunity || isParrying) return;
         
-        // 检查节拍时机
         if (Conductor.Instance.CheckInputTiming())
         {
             StartParry();
-        }
-        else
-        {
-            // 错拍会由PlayerController处理，这里不需要额外处理
-            Debug.Log("Parry timing missed - handled by PlayerController");
         }
     }
     
@@ -124,13 +105,11 @@ public class Swordfish : BaseFish
         
         Debug.Log("Swordfish parry activated");
         
-        // 播放格挡动画
         if (animator != null)
         {
             animator.SetTrigger("Parry");
         }
         
-        // 启动格挡窗口
         Invoke(nameof(EndParry), parryWindow);
     }
     
@@ -152,11 +131,9 @@ public class Swordfish : BaseFish
         CancelInvoke(nameof(EndParry));
         isParrying = false;
         
-        // 刷新格挡机会
         hasParryOpportunity = true;
         beatsSinceLastParry = 0;
         
-        // 执行反击
         PerformCounterAttack(attacker);
         
         Debug.Log("Parry successful! Counter attack!");
@@ -169,15 +146,9 @@ public class Swordfish : BaseFish
     {
         if (target == null) return;
         
-        // 朝向目标
-        Vector3 directionToTarget = (target.transform.position - transform.position).normalized;
-        currentDirection = directionToTarget;
-        
-        // 强力冲刺反击
         Vector3 targetPosition = target.transform.position;
         movementController.SetTargetPosition(targetPosition, 0.3f);
         
-        // 造成反击伤害
         target.TakeDamage(Mathf.RoundToInt(counterDamage));
         
         if (target.CurrentHealth <= 0)
@@ -186,7 +157,6 @@ public class Swordfish : BaseFish
             ComboSystem.Instance?.OnEnemyKilled();
         }
         
-        // 播放反击动画
         if (animator != null)
         {
             animator.SetTrigger("CounterAttack");
@@ -194,50 +164,15 @@ public class Swordfish : BaseFish
     }
     
     /// <summary>
-    /// 更新移动方向 - 优先使用鼠标方向
-    /// </summary>
-    private void UpdateMovementDirection()
-    {
-        // 获取鼠标世界坐标
-        Vector3 mouseWorldPos = GetMouseWorldPosition();
-        Vector3 directionToMouse = (mouseWorldPos - transform.position).normalized;
-        
-        // 如果鼠标距离足够远，使用鼠标方向
-        float distanceToMouse = Vector3.Distance(transform.position, mouseWorldPos);
-        if (distanceToMouse > 1f)
-        {
-            currentDirection = directionToMouse;
-        }
-        else
-        {
-            // 如果鼠标太近，朝向最近的敌人
-            BaseFish nearestEnemy = FindNearestEnemy();
-            if (nearestEnemy != null)
-            {
-                currentDirection = (nearestEnemy.transform.position - transform.position).normalized;
-            }
-        }
-    }
-    
-    /// <summary>
-    /// 获取鼠标世界坐标
-    /// </summary>
-    private Vector3 GetMouseWorldPosition()
-    {
-        Vector3 mouseScreenPos = Input.mousePosition;
-        mouseScreenPos.z = Camera.main.transform.position.z * -1;
-        return Camera.main.ScreenToWorldPoint(mouseScreenPos);
-    }
-    
-    /// <summary>
-    /// 执行移动
+    /// 执行移动 - 使用基类的GetMouseDirection
     /// </summary>
     private void PerformMovement()
     {
-        Vector3 targetPosition = transform.position + currentDirection * moveDistance * (currentSpeed / (float)maxSpeed);
+        Vector3 moveDir = GetMouseDirection();
+        Vector3 targetPosition = transform.position + moveDir * moveDistance * (currentSpeed / (float)maxSpeed);
         targetPosition = ClampToScreenBounds(targetPosition);
         
-        float moveDuration = 60f / Conductor.Instance.bpm; // 一拍的时间
+        float moveDuration = Conductor.Instance.BeatsToSeconds(1f); // 一拍的时间
         movementController.SetTargetPosition(targetPosition, moveDuration);
     }
     
@@ -299,21 +234,6 @@ public class Swordfish : BaseFish
         return nearest;
     }
     
-    /// <summary>
-    /// 限制位置在屏幕边界内
-    /// </summary>
-    private Vector3 ClampToScreenBounds(Vector3 position)
-    {
-        Camera cam = Camera.main;
-        if (cam != null)
-        {
-            Vector3 screenBounds = cam.ScreenToWorldPoint(new Vector3(Screen.width, Screen.height, cam.transform.position.z));
-            position.x = Mathf.Clamp(position.x, -screenBounds.x + 1f, screenBounds.x - 1f);
-            position.y = Mathf.Clamp(position.y, -screenBounds.y + 1f, screenBounds.y - 1f);
-        }
-        return position;
-    }
-    
     protected override void OnBeatCustom(int beatCount)
     {
         // 处理格挡机会
@@ -365,6 +285,6 @@ public class Swordfish : BaseFish
         
         // 绘制移动方向
         Gizmos.color = Color.green;
-        Gizmos.DrawRay(transform.position, currentDirection * moveDistance);
+        Gizmos.DrawRay(transform.position, GetMouseDirection() * moveDistance);
     }
 }

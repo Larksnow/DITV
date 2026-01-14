@@ -24,16 +24,12 @@ public class Pufferfish : BaseFish
     {
         base.Awake();
         
-        // 刺豚不能自由移动
-        if (movementController is InterpolationMovement interpMovement)
-        {
-            interpMovement.SetCanFreeMove(false);
-        }
+        // 刺豚默认不能自由移动（可以通过Inspector调整）
+        canFreeMove = false;
     }
     
     public override void OnRhythmInput()
     {
-        // 刺豚的节拍输入由PlayerController处理时机，这里直接执行动作
         PerformInflateAttack();
     }
     
@@ -100,11 +96,6 @@ public class Pufferfish : BaseFish
         {
             PerformDeflateAndDash();
         }
-        else
-        {
-            // 错拍会由PlayerController处理，这里不需要额外处理
-            Debug.Log("Deflate timing missed - handled by PlayerController");
-        }
     }
     
     /// <summary>
@@ -117,16 +108,16 @@ public class Pufferfish : BaseFish
         // 计算位移距离
         float dashDistance = dashDistances[currentAttackLevel - 1];
         
-        // 计算位移方向（朝向最近的敌人相反方向，或输入方向）
-        Vector3 dashDirection = GetDashDirection();
+        // 计算位移方向 - 使用基类的GetMouseDirection
+        Vector3 dashDirection = GetMouseDirection();
         Vector3 targetPosition = transform.position + dashDirection * dashDistance;
         
-        // 限制在屏幕边界内
+        // 限制在屏幕边界内（使用基类方法）
         targetPosition = ClampToScreenBounds(targetPosition);
         
         // 执行位移（带无敌帧）
         movementController.SetTargetPosition(targetPosition, dashDuration);
-        SetInvincible(true); // 位移过程中无敌
+        SetInvincible(true);
         
         // 重置状态
         isInflated = false;
@@ -140,44 +131,7 @@ public class Pufferfish : BaseFish
             animator.SetInteger("AttackLevel", 0);
         }
         
-        Debug.Log($"Pufferfish deflate and dash to {targetPosition}");
-    }
-    
-    /// <summary>
-    /// 获取冲刺方向 - 优先使用鼠标方向
-    /// </summary>
-    private Vector3 GetDashDirection()
-    {
-        // 获取鼠标世界坐标
-        Vector3 mouseWorldPos = GetMouseWorldPosition();
-        Vector3 directionToMouse = (mouseWorldPos - transform.position).normalized;
-        
-        // 如果鼠标距离足够远，使用鼠标方向
-        float distanceToMouse = Vector3.Distance(transform.position, mouseWorldPos);
-        if (distanceToMouse > 1f)
-        {
-            return directionToMouse;
-        }
-        
-        // 否则远离最近的敌人
-        BaseFish nearestEnemy = FindNearestEnemy();
-        if (nearestEnemy != null)
-        {
-            return (transform.position - nearestEnemy.transform.position).normalized;
-        }
-        
-        // 默认向右
-        return Vector3.right;
-    }
-    
-    /// <summary>
-    /// 获取鼠标世界坐标
-    /// </summary>
-    private Vector3 GetMouseWorldPosition()
-    {
-        Vector3 mouseScreenPos = Input.mousePosition;
-        mouseScreenPos.z = Camera.main.transform.position.z * -1;
-        return Camera.main.ScreenToWorldPoint(mouseScreenPos);
+        Debug.Log($"Pufferfish deflate and dash");
     }
     
     /// <summary>
@@ -203,21 +157,6 @@ public class Pufferfish : BaseFish
         }
         
         return nearest;
-    }
-    
-    /// <summary>
-    /// 限制位置在屏幕边界内
-    /// </summary>
-    private Vector3 ClampToScreenBounds(Vector3 position)
-    {
-        Camera cam = Camera.main;
-        if (cam != null)
-        {
-            Vector3 screenBounds = cam.ScreenToWorldPoint(new Vector3(Screen.width, Screen.height, cam.transform.position.z));
-            position.x = Mathf.Clamp(position.x, -screenBounds.x + 1f, screenBounds.x - 1f);
-            position.y = Mathf.Clamp(position.y, -screenBounds.y + 1f, screenBounds.y - 1f);
-        }
-        return position;
     }
     
     protected override void OnBeatCustom(int beatCount)
