@@ -24,6 +24,7 @@ public class PlayerController : MonoBehaviour, IBeatListener
     [Header("Rhythm State")]
     [SerializeField] private bool isPunished = false; // 是否处于惩罚状态
     private int punishedBeat = -1; // 被惩罚的拍子编号
+    private int lastActionBeat = -1; // 上次成功执行动作的拍子编号（限制一拍一动作）
     
     private static PlayerController instance;
     public static PlayerController Instance => instance;
@@ -150,8 +151,17 @@ public class PlayerController : MonoBehaviour, IBeatListener
         // 检查节拍时机
         if (Conductor.Instance != null && Conductor.Instance.CheckInputTiming())
         {
+            // 检查这一拍是否已经执行过动作
+            int currentBeat = Mathf.RoundToInt(Conductor.Instance.songPositionInBeats);
+            if (currentBeat == lastActionBeat)
+            {
+                Debug.Log("Input blocked - already acted this beat");
+                return;
+            }
+            
             // 节拍正确，执行角色动作
             HandleRhythmSuccess();
+            lastActionBeat = currentBeat;
             currentFish.OnRhythmInput();
         }
         else
@@ -240,8 +250,14 @@ public class PlayerController : MonoBehaviour, IBeatListener
                     {
                         if (Conductor.Instance != null && Conductor.Instance.CheckInputTiming())
                         {
-                            HandleRhythmSuccess();
-                            pufferfish.TryDeflate();
+                            // 检查这一拍是否已经执行过动作
+                            int currentBeat = Mathf.RoundToInt(Conductor.Instance.songPositionInBeats);
+                            if (currentBeat != lastActionBeat)
+                            {
+                                HandleRhythmSuccess();
+                                lastActionBeat = currentBeat;
+                                pufferfish.TryDeflate();
+                            }
                         }
                         else
                         {
@@ -252,12 +268,30 @@ public class PlayerController : MonoBehaviour, IBeatListener
                 break;
                 
             case Swordfish swordfish:
-                // 剑鱼的格挡操作（需要节拍判定）
+                // 剑鱼的格挡操作（需要节拍判定，且只有最高速+CD结束时才能格挡）
                 if (Input.GetKeyDown(secondaryKey) && !isPunished)
                 {
+                    // 检查是否可以格挡
+                    if (!swordfish.CanParry)
+                    {
+                        Debug.Log($"Swordfish cannot parry: speed={swordfish.CurrentSpeed}, canParry={swordfish.CanParry}");
+                        return;
+                    }
+                    
                     if (Conductor.Instance != null && Conductor.Instance.CheckInputTiming())
                     {
-                        swordfish.TryParry();
+                        // 检查这一拍是否已经执行过动作
+                        int currentBeat = Mathf.RoundToInt(Conductor.Instance.songPositionInBeats);
+                        if (currentBeat != lastActionBeat)
+                        {
+                            HandleRhythmSuccess();
+                            lastActionBeat = currentBeat;
+                            swordfish.TryParry();
+                        }
+                    }
+                    else
+                    {
+                        HandleRhythmFailure();
                     }
                 }
                 break;

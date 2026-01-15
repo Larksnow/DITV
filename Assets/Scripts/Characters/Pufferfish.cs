@@ -75,8 +75,11 @@ public class Pufferfish : BaseFish
     /// </summary>
     public override void OnRhythmInput()
     {
-        // 正在位移时不能攻击
-        if (isDashing) return;
+        // 如果正在冲刺，打断冲刺
+        if (isDashing)
+        {
+            InterruptDash();
+        }
         
         // 已达到最大攻击层级，不接受更多攻击输入
         if (currentAttackLevel >= attackRanges.Length)
@@ -90,6 +93,23 @@ public class Pufferfish : BaseFish
         
         // 执行膨胀攻击
         PerformInflateAttack();
+    }
+    
+    /// <summary>
+    /// 打断冲刺
+    /// </summary>
+    private void InterruptDash()
+    {
+        isDashing = false;
+        currentAttackLevel = 0;
+        
+        // 停止移动
+        movementController.StopMovement();
+        
+        // 结束无敌
+        SetInvincible(false);
+        
+        Debug.Log("Pufferfish dash interrupted by attack");
     }
     
     /// <summary>
@@ -133,7 +153,42 @@ public class Pufferfish : BaseFish
             attackHitbox.transform.localScale = originalHitboxScale * scaleMultiplier;
         }
         
+        // 每次攻击时主动检测范围内的敌人
+        DealDamageInRange();
+        
         Debug.Log($"Pufferfish inflate attack level {currentAttackLevel}, scale: {scaleMultiplier:F2}x");
+    }
+    
+    /// <summary>
+    /// 主动检测范围内的敌人并造成伤害
+    /// </summary>
+    private void DealDamageInRange()
+    {
+        // 使用当前攻击等级的范围
+        float attackRange = attackRanges[currentAttackLevel - 1];
+        
+        // 检测范围内的所有碰撞体
+        Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, attackRange, enemyLayer);
+        
+        foreach (var hit in hits)
+        {
+            BaseFish targetFish = hit.GetComponent<BaseFish>();
+            if (targetFish != null && !targetFish.IsPlayer && targetFish != this)
+            {
+                // 检查敌人是否无敌（避免同一拍内重复伤害）
+                if (!targetFish.IsInvincible)
+                {
+                    targetFish.TakeDamage(attackDamage);
+                    Debug.Log($"Pufferfish hit {targetFish.gameObject.name} at level {currentAttackLevel}!");
+                    
+                    if (targetFish.CurrentHealth <= 0)
+                    {
+                        RestoreHealth(1);
+                        ComboSystem.Instance?.OnEnemyKilled();
+                    }
+                }
+            }
+        }
     }
     
     /// <summary>
@@ -291,17 +346,30 @@ public class Pufferfish : BaseFish
         // 如果正在位移，不处理
         if (isDashing) return;
         
-        // 如果在膨胀状态
-        if (isInflated)
+        // 如果在膨胀状态，延迟检查是否需要复原
+        // 延迟到 late window 结束后（inputThreshold 秒后）
+        // 这样玩家有完整的输入窗口，复原时机仍然接近节拍
+        if (isInflated && lastInputBeat < beatCount)
         {
-            // 检查上一拍是否有输入（当前拍 - 上次输入拍 > 1 说明上一拍没输入）
-            // 注意：beatCount 是当前拍，lastInputBeat 是上次输入的拍
-            // 如果 lastInputBeat < beatCount - 1，说明上一拍没有输入
-            if (lastInputBeat < beatCount - 1)
-            {
-                // 上一拍没有输入，自动缩小
-                ResetToNormal();
-            }
+            StartCoroutine(DelayedResetCheck(beatCount));
+        }
+    }
+    
+    /// <summary>
+    /// 延迟检查是否需要复原（等待 late window 结束）
+    /// </summary>
+    private IEnumerator DelayedResetCheck(int beatCount)
+    {
+        // 等待 late window 结束
+        // 这个延迟是必要的，给玩家完整的输入窗口
+        // 延迟时间 = inputThreshold，复原时机在节拍后 0.15 秒左右
+        float waitTime = Conductor.Instance != null ? Conductor.Instance.inputThreshold : 0.15f;
+        yield return new WaitForSeconds(waitTime);
+        
+        // 再次检查：如果玩家在 late window 内输入了，lastInputBeat 会更新
+        if (isInflated && !isDashing && lastInputBeat < beatCount)
+        {
+            ResetToNormal();
         }
     }
     
