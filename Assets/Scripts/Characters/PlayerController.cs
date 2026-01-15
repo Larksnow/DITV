@@ -224,34 +224,62 @@ public class PlayerController : MonoBehaviour, IBeatListener
     /// </summary>
     private void HandleSpecialInput()
     {
-        if (currentFish == null || isPunished) return;
+        if (currentFish == null) return;
         
         // 根据角色类型处理不同的特殊输入
         switch (currentFish)
         {
             case Pufferfish pufferfish:
-                // 刺豚的缩小操作
-                if (Input.GetKeyDown(secondaryKey))
+                // 刺豚的缩小操作（需要节拍判定）
+                if (Input.GetKeyDown(secondaryKey) && !isPunished)
                 {
-                    pufferfish.TryDeflate();
+                    if (Conductor.Instance != null && Conductor.Instance.CheckInputTiming())
+                    {
+                        pufferfish.TryDeflate();
+                    }
                 }
                 break;
                 
             case Swordfish swordfish:
-                // 剑鱼的格挡操作
-                if (Input.GetKeyDown(secondaryKey))
+                // 剑鱼的格挡操作（需要节拍判定）
+                if (Input.GetKeyDown(secondaryKey) && !isPunished)
                 {
-                    swordfish.TryParry();
+                    if (Conductor.Instance != null && Conductor.Instance.CheckInputTiming())
+                    {
+                        swordfish.TryParry();
+                    }
                 }
                 break;
                 
             case Tuna tuna:
-                // 金枪鱼的蓄力释放
+                // 金枪鱼的蓄力释放（松开按键时检查节拍）
                 if (Input.GetKeyUp(actionKey))
                 {
-                    tuna.ReleaseCharge();
+                    HandleTunaRelease(tuna);
                 }
                 break;
+        }
+    }
+    
+    /// <summary>
+    /// 处理金枪鱼的蓄力释放
+    /// </summary>
+    private void HandleTunaRelease(Tuna tuna)
+    {
+        if (!tuna.IsCharging) return;
+        
+        // 检查是否在节拍上
+        if (Conductor.Instance != null && Conductor.Instance.CheckInputTiming())
+        {
+            // 节拍正确，释放攻击
+            HandleRhythmSuccess();
+            tuna.ReleaseCharge(true);
+        }
+        else
+        {
+            // 节拍错误，取消蓄力并惩罚
+            HandleRhythmFailure();
+            tuna.ReleaseCharge(false);
         }
     }
     

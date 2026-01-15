@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections;
 
 /// <summary>
 /// 金枪鱼 - 蓄力冲刺攻击
@@ -8,8 +9,7 @@ public class Tuna : BaseFish
     [Header("Tuna Settings")]
     [SerializeField] private float[] chargeDamages = { 2f, 3f, 4f }; // 三个蓄力等级的伤害
     [SerializeField] private float[] chargeDistances = { 3f, 5f, 7f }; // 对应的冲刺距离
-    [SerializeField] private float chargeDuration = 1f; // 冲刺持续时间（一拍）
-    [SerializeField] private float freeMovementSpeed = 2f; // 自由移动速度（较慢）
+    [SerializeField] private float dashDurationBeats = 1f; // 冲刺持续时间（拍数）
     
     [Header("Charge State")]
     [SerializeField] private int chargeLevel = 0; // 0-3，蓄力等级
@@ -18,8 +18,18 @@ public class Tuna : BaseFish
     [SerializeField] private int chargeBeatCount = 0;
     [SerializeField] private int maxChargeBeats = 3;
     
+    [Header("Scale Effect")]
+    [SerializeField] private float maxScaleMultiplier = 1.3f; // 最大蓄力时的缩放倍数
+    [SerializeField] private float scaleSpeed = 5f; // 缩放速度
+    private Vector3 originalScale;
+    private float targetScaleMultiplier = 1f;
+    
     [Header("Visual")]
     [SerializeField] private LayerMask enemyLayer = -1;
+    
+    // 公开属性供PlayerController使用
+    public bool IsCharging => isCharging;
+    public bool IsDashing => isDashing;
     
     protected override void Awake()
     {
@@ -27,39 +37,33 @@ public class Tuna : BaseFish
         
         // 金枪鱼可以自由移动，但速度较慢
         freeMovementSpeed = 2f;
+        
+        // 保存原始缩放
+        originalScale = transform.localScale;
     }
     
     protected override void Update()
     {
         base.Update();
         
-        // 处理蓄力输入
-        HandleChargeInput();
+        // 平滑缩放效果
+        UpdateScaleEffect();
     }
     
     /// <summary>
-    /// 处理蓄力输入
+    /// 节拍输入 - 开始蓄力（由PlayerController在节拍正确时调用）
     /// </summary>
-    private void HandleChargeInput()
+    public override void OnRhythmInput()
     {
+        // 如果正在冲刺，忽略输入
         if (isDashing) return;
         
-        // 开始蓄力
-        if (Input.GetKeyDown(KeyCode.Space) && !isCharging)
+        // 如果没在蓄力，开始蓄力
+        if (!isCharging)
         {
             StartCharge();
         }
-        
-        // 释放蓄力
-        if (Input.GetKeyUp(KeyCode.Space) && isCharging)
-        {
-            ReleaseCharge();
-        }
-    }
-    
-    public override void OnRhythmInput()
-    {
-        // 金枪鱼的主要输入通过蓄力系统处理
+        // 如果已经在蓄力，这个输入会被忽略（松开按键时才释放）
     }
     
     /// <summary>
@@ -67,43 +71,35 @@ public class Tuna : BaseFish
     /// </summary>
     private void StartCharge()
     {
-        if (!Conductor.Instance.CheckInputTiming()) return;
-        
         isCharging = true;
         chargeLevel = 0;
         chargeBeatCount = 0;
+        targetScaleMultiplier = 1f;
         
         Debug.Log("Tuna started charging");
-        
-        if (animator != null)
-        {
-            animator.SetBool("IsCharging", true);
-        }
     }
     
     /// <summary>
-    /// 释放蓄力
+    /// 释放蓄力（由PlayerController调用）
     /// </summary>
-    public void ReleaseCharge()
+    /// <param name="onBeat">是否在节拍上释放</param>
+    public void ReleaseCharge(bool onBeat)
     {
         if (!isCharging) return;
         
-        if (!Conductor.Instance.CheckInputTiming())
+        if (onBeat && chargeLevel > 0)
         {
-            CancelCharge();
-            return;
+            // 节拍正确且有蓄力，执行冲刺
+            PerformChargedDash();
         }
-        
-        PerformChargedDash();
+        else
+        {
+            // 节拍错误或没蓄力，取消
+            CancelCharge();
+        }
         
         isCharging = false;
-        chargeLevel = 0;
         chargeBeatCount = 0;
-        
-        if (animator != null)
-        {
-            animator.SetBool("IsCharging", false);
-        }
     }
     
     /// <summary>
@@ -111,14 +107,8 @@ public class Tuna : BaseFish
     /// </summary>
     private void CancelCharge()
     {
-        isCharging = false;
         chargeLevel = 0;
-        chargeBeatCount = 0;
-        
-        if (animator != null)
-        {
-            animator.SetBool("IsCharging", false);
-        }
+        targetScaleMultiplier = 1f;
         
         Debug.Log("Tuna charge cancelled");
     }
@@ -140,35 +130,49 @@ public class Tuna : BaseFish
         Vector3 targetPosition = transform.position + dashDirection * distance;
         targetPosition = ClampToScreenBounds(targetPosition);
         
-        movementController.SetTargetPosition(targetPosition, chargeDuration);
+        // 计算冲刺时间（拍数转秒数）
+        float dashTimeInSeconds = Conductor.Instance.BeatsToSeconds(dashDurationBeats);
+        
+        // 开始移动
+        movementController.SetTargetPosition(targetPosition, dashTimeInSeconds);
         SetInvincible(true);
         
-        StartCoroutine(DashAttackCoroutine(damage));
-        
+        // 同时开始攻击动画
         if (animator != null)
         {
-            animator.SetTrigger("ChargedDash");
-            animator.SetInteger("ChargeLevel", chargeLevel);
+            animator.SetBool("attacking", true);
         }
         
-        Debug.Log($"Tuna charged dash level {chargeLevel}");
+        // 开始冲刺攻击协程
+        StartCoroutine(DashAttackCoroutine(damage, dashTimeInSeconds));
+        
+        Debug.Log($"Tuna charged dash level {chargeLevel}, duration: {dashTimeInSeconds:F2}s");
     }
     
     /// <summary>
     /// 冲刺攻击协程
     /// </summary>
-    private System.Collections.IEnumerator DashAttackCoroutine(float damage)
+    private IEnumerator DashAttackCoroutine(float damage, float duration)
     {
         float elapsed = 0f;
         
-        while (elapsed < chargeDuration)
+        while (elapsed < duration)
         {
             CheckDashCollision(damage);
             elapsed += Time.deltaTime;
             yield return null;
         }
         
+        // 冲刺结束
         isDashing = false;
+        chargeLevel = 0;
+        targetScaleMultiplier = 1f;
+        
+        // 结束攻击动画
+        if (animator != null)
+        {
+            animator.SetBool("attacking", false);
+        }
     }
     
     /// <summary>
@@ -195,33 +199,21 @@ public class Tuna : BaseFish
     }
     
     /// <summary>
-    /// 找到最近的敌人
+    /// 更新缩放效果
     /// </summary>
-    private BaseFish FindNearestEnemy()
+    private void UpdateScaleEffect()
     {
-        BaseFish[] allFish = FindObjectsOfType<BaseFish>();
-        BaseFish nearest = null;
-        float nearestDistance = float.MaxValue;
+        // 计算当前目标缩放
+        float currentMultiplier = transform.localScale.x / originalScale.x;
         
-        foreach (BaseFish fish in allFish)
-        {
-            if (!fish.IsPlayer && fish != this)
-            {
-                float distance = Vector3.Distance(transform.position, fish.transform.position);
-                if (distance < nearestDistance)
-                {
-                    nearestDistance = distance;
-                    nearest = fish;
-                }
-            }
-        }
-        
-        return nearest;
+        // 平滑插值到目标缩放
+        float newMultiplier = Mathf.Lerp(currentMultiplier, targetScaleMultiplier, Time.deltaTime * scaleSpeed);
+        transform.localScale = originalScale * newMultiplier;
     }
     
     protected override void OnBeatCustom(int beatCount)
     {
-        // 处理蓄力逻辑
+        // 处理蓄力逻辑 - 每拍增加蓄力等级
         if (isCharging)
         {
             chargeBeatCount++;
@@ -229,19 +221,19 @@ public class Tuna : BaseFish
             if (chargeBeatCount <= maxChargeBeats)
             {
                 chargeLevel = chargeBeatCount;
-                Debug.Log($"Tuna charge level: {chargeLevel}");
                 
-                // 更新蓄力视觉效果
-                if (animator != null)
-                {
-                    animator.SetInteger("ChargeLevel", chargeLevel);
-                }
+                // 计算缩放目标（1到maxScaleMultiplier之间）
+                float scaleProgress = (float)chargeLevel / maxChargeBeats;
+                targetScaleMultiplier = Mathf.Lerp(1f, maxScaleMultiplier, scaleProgress);
+                
+                Debug.Log($"Tuna charge level: {chargeLevel}, scale: {targetScaleMultiplier:F2}x");
             }
         }
     }
     
     protected override void HandleFreeMovement()
     {
+        // 蓄力和冲刺时不能自由移动
         if (!isCharging && !isDashing)
         {
             base.HandleFreeMovement();
@@ -250,12 +242,41 @@ public class Tuna : BaseFish
     
     void OnDrawGizmosSelected()
     {
-        if (chargeLevel > 0)
+        DrawDebugGizmos();
+    }
+    
+    void OnDrawGizmos()
+    {
+        if (isCharging || isDashing)
         {
-            Gizmos.color = Color.blue;
+            DrawDebugGizmos();
+        }
+    }
+    
+    private void DrawDebugGizmos()
+    {
+        if (!Application.isPlaying) return;
+        
+        // 绘制冲刺方向和距离
+        if (chargeLevel > 0 && chargeLevel <= chargeDistances.Length)
+        {
             Vector3 dashDirection = GetMouseDirection();
             float distance = chargeDistances[chargeLevel - 1];
+            
+            // 蓄力时蓝色，冲刺时红色
+            Gizmos.color = isDashing ? Color.red : Color.blue;
             Gizmos.DrawRay(transform.position, dashDirection * distance);
+            
+            // 绘制冲刺终点
+            Vector3 endPoint = transform.position + dashDirection * distance;
+            Gizmos.DrawWireSphere(endPoint, 0.3f);
+        }
+        
+        // 绘制碰撞检测范围
+        if (isDashing)
+        {
+            Gizmos.color = new Color(1f, 0f, 0f, 0.3f);
+            Gizmos.DrawSphere(transform.position, 1f);
         }
     }
 }
