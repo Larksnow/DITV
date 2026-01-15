@@ -17,6 +17,9 @@ public class PlayerController : MonoBehaviour, IBeatListener
     [Header("Rhythm Feedback")]
     [SerializeField] private SpriteRenderer visualFeedback; // 节拍反馈
     [SerializeField] private bool showVisualFeedback = true;
+    [SerializeField] private bool showColorFeedback = true; // 是否显示颜色反馈（正确/错误）
+    private Color defaultColor = Color.white; // 默认颜色
+    private Coroutine colorFlashCoroutine; // 当前颜色闪烁协程
     
     [Header("Rhythm State")]
     [SerializeField] private bool isPunished = false; // 是否处于惩罚状态
@@ -166,9 +169,9 @@ public class PlayerController : MonoBehaviour, IBeatListener
         Debug.Log("PERFECT! Rhythm action executed.");
         
         // 视觉反馈
-        if (visualFeedback != null)
+        if (showColorFeedback && visualFeedback != null)
         {
-            StartCoroutine(FlashColor(Color.green, 0.2f));
+            FlashColor(Color.green, 0.2f);
         }
     }
     
@@ -190,9 +193,9 @@ public class PlayerController : MonoBehaviour, IBeatListener
         }
         
         // 视觉反馈
-        if (visualFeedback != null)
+        if (showColorFeedback && visualFeedback != null)
         {
-            StartCoroutine(FlashColor(Color.red, 0.5f));
+            FlashColor(Color.red, 0.5f);
         }
         
         Debug.Log($"Punished on beat {punishedBeat}, will be released when entering beat {punishedBeat + 1}'s early window");
@@ -230,12 +233,20 @@ public class PlayerController : MonoBehaviour, IBeatListener
         switch (currentFish)
         {
             case Pufferfish pufferfish:
-                // 刺豚的缩小操作（需要节拍判定）
+                // 刺豚的位移操作（需要节拍判定）
                 if (Input.GetKeyDown(secondaryKey) && !isPunished)
                 {
-                    if (Conductor.Instance != null && Conductor.Instance.CheckInputTiming())
+                    if (pufferfish.CanDeflate)
                     {
-                        pufferfish.TryDeflate();
+                        if (Conductor.Instance != null && Conductor.Instance.CheckInputTiming())
+                        {
+                            HandleRhythmSuccess();
+                            pufferfish.TryDeflate();
+                        }
+                        else
+                        {
+                            HandleRhythmFailure();
+                        }
                     }
                 }
                 break;
@@ -296,6 +307,12 @@ public class PlayerController : MonoBehaviour, IBeatListener
         {
             visualFeedback = currentFish.GetComponent<SpriteRenderer>();
         }
+        
+        // 保存默认颜色
+        if (visualFeedback != null)
+        {
+            defaultColor = visualFeedback.color;
+        }
     }
     
     /// <summary>
@@ -303,40 +320,38 @@ public class PlayerController : MonoBehaviour, IBeatListener
     /// </summary>
     private void UpdateVisualFeedback()
     {
-        if (!showVisualFeedback || visualFeedback == null) return;
-        
-        // 根据状态更新颜色
-        if (isPunished)
-        {
-            // 惩罚状态显示红色
-            if (visualFeedback.color != Color.red)
-            {
-                visualFeedback.color = Color.red;
-            }
-        }
-        else if (visualFeedback.color == Color.red)
-        {
-            // 恢复正常颜色
-            visualFeedback.color = Color.white;
-        }
+        // 不再在这里处理颜色，由FlashColor统一管理
     }
     
     /// <summary>
     /// 颜色闪烁效果
     /// </summary>
-    private IEnumerator FlashColor(Color flashColor, float duration)
+    private void FlashColor(Color flashColor, float duration)
     {
-        if (visualFeedback == null) yield break;
+        if (visualFeedback == null) return;
         
-        Color originalColor = visualFeedback.color;
+        // 停止之前的协程
+        if (colorFlashCoroutine != null)
+        {
+            StopCoroutine(colorFlashCoroutine);
+        }
+        
+        colorFlashCoroutine = StartCoroutine(FlashColorCoroutine(flashColor, duration));
+    }
+    
+    private IEnumerator FlashColorCoroutine(Color flashColor, float duration)
+    {
         visualFeedback.color = flashColor;
         
         yield return new WaitForSeconds(duration);
         
-        if (visualFeedback != null && !isPunished)
+        // 恢复默认颜色
+        if (visualFeedback != null)
         {
-            visualFeedback.color = originalColor;
+            visualFeedback.color = defaultColor;
         }
+        
+        colorFlashCoroutine = null;
     }
     
     #endregion

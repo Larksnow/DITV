@@ -140,7 +140,7 @@ public class Tuna : BaseFish
         // 同时开始攻击动画
         if (animator != null)
         {
-            animator.SetBool("attacking", true);
+            animator.SetBool("Attacking", true);
         }
         
         // 开始冲刺攻击协程
@@ -171,7 +171,7 @@ public class Tuna : BaseFish
         // 结束攻击动画
         if (animator != null)
         {
-            animator.SetBool("attacking", false);
+            animator.SetBool("Attacking", false);
         }
     }
     

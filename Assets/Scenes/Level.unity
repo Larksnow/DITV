@@ -816,12 +816,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ebd49c5e0c23d854e8939d01f24227f1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  currentFish: {fileID: 9220390809320402289}
+  currentFish: {fileID: 7212899413308689296}
   actionKey: 32
   secondaryKey: 304
   uiCursor: {fileID: 1880674223}
   visualFeedback: {fileID: 0}
-  showVisualFeedback: 1
+  showVisualFeedback: 0
+  showColorFeedback: 0
   isPunished: 0
 --- !u!1 &1880674221
 GameObject:
@@ -1535,7 +1536,7 @@ MonoBehaviour:
   currentHealth: 0
   isInvincible: 0
   isPlayer: 1
-  canFreeMove: 1
+  canFreeMove: 0
   freeMovementSpeed: 5
   rotationSpeed: 15
   screenMargin: 1
@@ -1547,12 +1548,17 @@ MonoBehaviour:
   - 2
   - 3
   - 4
-  inflateDuration: 1
-  dashDuration: 2
+  scaleMultipliers:
+  - 1.2
+  - 1.4
+  - 1.6
+  dashDurationBeats: 1
   attackDamage: 1
+  attackHitbox: {fileID: 5982365955517013650}
   currentAttackLevel: 0
   isInflated: 0
   canDeflate: 0
+  isDashing: 0
   enemyLayer:
     serializedVersion: 2
     m_Bits: 4294967295
@@ -1693,17 +1699,6 @@ Rigidbody2D:
   m_SleepingMode: 1
   m_CollisionDetection: 0
   m_Constraints: 0
---- !u!114 &9220390809320402289 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 6451955337367292486, guid: 79db80b0240d38e4c9d2a83c99cb0293, type: 3}
-  m_PrefabInstance: {fileID: 1429307863856701104}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 66f460b76b0084b4696305b7209e8c45, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
