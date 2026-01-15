@@ -25,6 +25,7 @@ public class Swordfish : BaseFish
     [Header("Hitboxes")]
     [SerializeField] private Collider2D noseHitbox; // 最高速时的嘴尖攻击判定（只在idle状态有效）
     [SerializeField] private Collider2D counterHitbox; // 反击冲刺时的攻击判定
+    [SerializeField] private Collider2D parryHitbox; // 格挡时的碰撞体（用于检测敌人攻击）
     private AttackHitbox noseHitboxScript;
     private AttackHitbox counterHitboxScript;
     
@@ -89,6 +90,12 @@ public class Swordfish : BaseFish
                 counterHitboxScript = counterHitbox.gameObject.AddComponent<AttackHitbox>();
             }
             counterHitboxScript.OnHitTarget = HandleCounterHit;
+        }
+        
+        // 初始化格挡hitbox（默认禁用）
+        if (parryHitbox != null)
+        {
+            parryHitbox.enabled = false;
         }
     }
     
@@ -232,6 +239,12 @@ public class Swordfish : BaseFish
             noseHitbox.enabled = false;
         }
         
+        // 启用格挡hitbox
+        if (parryHitbox != null)
+        {
+            parryHitbox.enabled = true;
+        }
+        
         Debug.Log("Swordfish parry activated");
         
         // 动画：ideal -> parry (Parrying = true)
@@ -268,6 +281,12 @@ public class Swordfish : BaseFish
     {
         isParrying = false;
         
+        // 禁用格挡hitbox
+        if (parryHitbox != null)
+        {
+            parryHitbox.enabled = false;
+        }
+        
         // 动画：parry -> ideal (Parrying = false, Attacking = false)
         if (animator != null)
         {
@@ -298,6 +317,12 @@ public class Swordfish : BaseFish
         // 格挡成功，重置CD，可以连续格挡
         parryCooldown = 0;
         canParry = true;
+        
+        // 禁用格挡hitbox
+        if (parryHitbox != null)
+        {
+            parryHitbox.enabled = false;
+        }
         
         // 标记下一拍执行反击
         pendingCounterAttack = true;
@@ -449,6 +474,7 @@ public class Swordfish : BaseFish
         // 禁用所有hitbox
         if (noseHitbox != null) noseHitbox.enabled = false;
         if (counterHitbox != null) counterHitbox.enabled = false;
+        if (parryHitbox != null) parryHitbox.enabled = false;
         
         if (animator != null)
         {
