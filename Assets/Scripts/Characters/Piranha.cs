@@ -16,7 +16,6 @@ public class Piranha : BaseFish
     
     [Header("Hitbox")]
     [SerializeField] private Collider2D attackHitbox; // 攻击判定框
-    [SerializeField] private LayerMask enemyLayer = -1;
     
     private bool isAttacking = false;
     private Coroutine attackCoroutine;
@@ -131,49 +130,10 @@ public class Piranha : BaseFish
     /// </summary>
     private void HandleHitboxCollision(Collider2D other)
     {
-        Debug.Log($"[Piranha] Hitbox collision detected with: {other.gameObject.name}, Layer: {LayerMask.LayerToName(other.gameObject.layer)}");
-        
-        // 检查是否在敌人层
-        if (((1 << other.gameObject.layer) & enemyLayer) == 0)
+        // 使用基类的统一伤害检测方法
+        if (TryDealDamage(other, attackDamage))
         {
-            Debug.Log($"[Piranha] Layer check failed. EnemyLayer mask: {enemyLayer.value}, Object layer bit: {1 << other.gameObject.layer}");
-            return;
-        }
-        
-        // 检查是否为敌人角色
-        BaseFish targetFish = other.GetComponent<BaseFish>();
-        if (targetFish == null)
-        {
-            Debug.Log($"[Piranha] No BaseFish component on {other.gameObject.name}");
-            return;
-        }
-        
-        if (targetFish.IsPlayer)
-        {
-            Debug.Log($"[Piranha] Target {other.gameObject.name} is player, skipping");
-            return;
-        }
-        
-        if (targetFish == this)
-        {
-            Debug.Log($"[Piranha] Target is self, skipping");
-            return;
-        }
-        
-        // 造成伤害
-        Debug.Log($"[Piranha] Dealing {attackDamage} damage to {targetFish.gameObject.name}!");
-        targetFish.TakeDamage(attackDamage);
-        
-        // 如果击杀了敌人，恢复血量
-        if (targetFish.CurrentHealth <= 0)
-        {
-            RestoreHealth(1);
-            
-            // 通知连击系统
-            if (ComboSystem.Instance != null)
-            {
-                ComboSystem.Instance.OnEnemyKilled();
-            }
+            Debug.Log($"[Piranha] Hit {other.gameObject.name}!");
         }
     }
     

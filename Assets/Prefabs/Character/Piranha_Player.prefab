@@ -14,7 +14,7 @@ GameObject:
   - component: {fileID: 2754786513251764146}
   - component: {fileID: 2421889437530789399}
   - component: {fileID: 2524754667262700332}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: Piranha_Player
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -80,7 +80,7 @@ SpriteRenderer:
   m_LightmapParameters: {fileID: 0}
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 1
+  m_SortingOrder: 99
   m_Sprite: {fileID: 2165864452073011999, guid: bffeea5c423c6954b8928b493ead59c6, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
@@ -108,18 +108,19 @@ MonoBehaviour:
   currentHealth: 0
   isInvincible: 0
   isPlayer: 1
+  targetLayer:
+    serializedVersion: 2
+    m_Bits: 8
   canFreeMove: 1
   freeMovementSpeed: 5
   rotationSpeed: 15
   screenMargin: 1
+  blinkInterval: 0.1
   dashDistance: 3
   attackDamage: 1
   attackDurationBeats: 0.5
   dashDurationBeats: 0.5
   attackHitbox: {fileID: 2927957406036371895}
-  enemyLayer:
-    serializedVersion: 2
-    m_Bits: 8
 --- !u!95 &2754786513251764146
 Animator:
   serializedVersion: 7
@@ -216,7 +217,7 @@ GameObject:
   - component: {fileID: 7912209646314031296}
   - component: {fileID: 2927957406036371895}
   - component: {fileID: 8290349213048114054}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: hitbox
   m_TagString: Untagged
   m_Icon: {fileID: 0}

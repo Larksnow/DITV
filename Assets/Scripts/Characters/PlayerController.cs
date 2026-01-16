@@ -57,6 +57,72 @@ public class PlayerController : MonoBehaviour, IBeatListener
         InitializeVisualFeedback();
     }
     
+    /// <summary>
+    /// 场景加载后重新初始化
+    /// </summary>
+    void OnEnable()
+    {
+        UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
+    }
+    
+    void OnDisable()
+    {
+        UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnSceneLoaded;
+    }
+    
+    private void OnSceneLoaded(UnityEngine.SceneManagement.Scene scene, UnityEngine.SceneManagement.LoadSceneMode mode)
+    {
+        // 场景重新加载后，重置状态
+        ResetState();
+        
+        // 尝试查找场景中的玩家角色
+        FindPlayerFish();
+        
+        // 重新注册到节拍系统（如果Conductor也是DontDestroyOnLoad的话可能需要）
+        if (Conductor.Instance != null && !Conductor.Instance.IsListenerRegistered(this))
+        {
+            Conductor.Instance.RegisterListener(this);
+        }
+    }
+    
+    /// <summary>
+    /// 重置控制器状态
+    /// </summary>
+    private void ResetState()
+    {
+        isPunished = false;
+        punishedBeat = -1;
+        lastActionBeat = -1;
+        
+        // 停止所有协程
+        StopAllCoroutines();
+        colorFlashCoroutine = null;
+    }
+    
+    /// <summary>
+    /// 查找场景中的玩家角色
+    /// </summary>
+    private void FindPlayerFish()
+    {
+        // 如果当前角色已经无效，尝试查找
+        if (currentFish == null)
+        {
+            // 查找场景中标记为玩家的鱼
+            BaseFish[] allFish = FindObjectsOfType<BaseFish>();
+            foreach (var fish in allFish)
+            {
+                if (fish.IsPlayer)
+                {
+                    SetCurrentFish(fish);
+                    Debug.Log($"Found player fish: {fish.gameObject.name}");
+                    return;
+                }
+            }
+            
+            Debug.LogWarning("No player fish found in scene!");
+        }
+    }
+    
     void OnDestroy()
     {
         // 取消注册

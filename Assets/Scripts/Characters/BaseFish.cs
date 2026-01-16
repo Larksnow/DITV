@@ -11,6 +11,9 @@ public abstract class BaseFish : MonoBehaviour, IBeatListener
     [SerializeField] protected bool isInvincible = false;
     [SerializeField] protected bool isPlayer = true; // 是否为玩家控制
     
+    [Header("Combat")]
+    [SerializeField] protected LayerMask targetLayer; // 攻击目标层（玩家设为Enemy，敌人设为Player）
+    
     [Header("Movement Settings")]
     [SerializeField] protected bool canFreeMove = true; // 是否允许自由移动（debug开关）
     [SerializeField] protected float freeMovementSpeed = 5f; // 自由移动速度
@@ -25,6 +28,8 @@ public abstract class BaseFish : MonoBehaviour, IBeatListener
     // 无敌帧相关
     private int invincibleBeatCount = 0;
     private int invincibleDuration = 1; // 一拍的无敌时间
+    private Coroutine blinkCoroutine; // 闪烁协程
+    [SerializeField] private float blinkInterval = 0.1f; // 闪烁间隔
     
     // 朝向相关
     protected bool isFacingRight = true;
@@ -192,9 +197,21 @@ public abstract class BaseFish : MonoBehaviour, IBeatListener
     
     /// <summary>
     /// 获取鼠标方向（从角色指向鼠标的单位向量）
+    /// 敌人则从EnemyAI获取攻击方向
     /// </summary>
     protected Vector3 GetMouseDirection()
     {
+        // 敌人从AI获取方向
+        if (!isPlayer)
+        {
+            EnemyAI ai = GetComponent<EnemyAI>();
+            if (ai != null)
+            {
+                return ai.GetAttackDirection();
+            }
+        }
+        
+        // 玩家从鼠标获取方向
         Vector3 mouseWorldPos = GetMouseWorldPosition();
         Vector3 direction = (mouseWorldPos - transform.position).normalized;
         return direction;
@@ -251,8 +268,11 @@ public abstract class BaseFish : MonoBehaviour, IBeatListener
         currentHealth -= damage;
         currentHealth = Mathf.Max(0, currentHealth);
         
-        // 触发无敌帧
-        SetInvincible(true);
+        // 只有玩家有无敌帧
+        if (isPlayer)
+        {
+            SetInvincible(true);
+        }
         
         // 视觉反馈
         OnTakeDamage();
@@ -282,10 +302,63 @@ public abstract class BaseFish : MonoBehaviour, IBeatListener
         if (invincible)
         {
             invincibleBeatCount = invincibleDuration;
+            StartBlinking();
+        }
+        else
+        {
+            StopBlinking();
+        }
+    }
+    
+    /// <summary>
+    /// 开始闪烁效果
+    /// </summary>
+    private void StartBlinking()
+    {
+        if (blinkCoroutine != null)
+        {
+            StopCoroutine(blinkCoroutine);
+        }
+        blinkCoroutine = StartCoroutine(BlinkCoroutine());
+    }
+    
+    /// <summary>
+    /// 停止闪烁效果
+    /// </summary>
+    private void StopBlinking()
+    {
+        if (blinkCoroutine != null)
+        {
+            StopCoroutine(blinkCoroutine);
+            blinkCoroutine = null;
         }
         
-        // 视觉反馈
-        UpdateInvincibleVisual();
+        // 恢复正常透明度
+        if (spriteRenderer != null)
+        {
+            Color color = spriteRenderer.color;
+            color.a = 1f;
+            spriteRenderer.color = color;
+        }
+    }
+    
+    /// <summary>
+    /// 闪烁协程
+    /// </summary>
+    private System.Collections.IEnumerator BlinkCoroutine()
+    {
+        bool visible = true;
+        while (isInvincible)
+        {
+            if (spriteRenderer != null)
+            {
+                Color color = spriteRenderer.color;
+                color.a = visible ? 1f : 0.3f;
+                spriteRenderer.color = color;
+            }
+            visible = !visible;
+            yield return new WaitForSeconds(blinkInterval);
+        }
     }
     
     /// <summary>
@@ -296,19 +369,6 @@ public abstract class BaseFish : MonoBehaviour, IBeatListener
         if (animator != null)
         {
             animator.SetTrigger("TakeDamage");
-        }
-    }
-    
-    /// <summary>
-    /// 更新无敌状态的视觉效果
-    /// </summary>
-    protected virtual void UpdateInvincibleVisual()
-    {
-        if (spriteRenderer != null)
-        {
-            Color color = spriteRenderer.color;
-            color.a = isInvincible ? 0.5f : 1f;
-            spriteRenderer.color = color;
         }
     }
     
@@ -326,7 +386,16 @@ public abstract class BaseFish : MonoBehaviour, IBeatListener
         {
             // 敌人死亡 - 通知游戏管理器
             GameManager.Instance?.OnEnemyKilled(this);
-            Destroy(gameObject);
+            
+            // 使用对象池回收
+            if (EnemySpawner.Instance != null)
+            {
+                EnemySpawner.Instance.DespawnEnemy(gameObject);
+            }
+            else
+            {
+                Destroy(gameObject);
+            }
         }
     }
     
@@ -347,6 +416,72 @@ public abstract class BaseFish : MonoBehaviour, IBeatListener
     public void SetAsPlayer(bool isPlayerControlled)
     {
         isPlayer = isPlayerControlled;
+    }
+    
+    /// <summary>
+    /// 设置攻击目标层
+    /// </summary>
+    public void SetTargetLayer(LayerMask layer)
+    {
+        targetLayer = layer;
+    }
+    
+    /// <summary>
+    /// 获取攻击目标层
+    /// </summary>
+    public LayerMask TargetLayer => targetLayer;
+    
+    /// <summary>
+    /// 检查目标是否在攻击层内
+    /// </summary>
+    protected bool IsValidTarget(GameObject target)
+    {
+        return ((1 << target.layer) & targetLayer) != 0;
+    }
+    
+    /// <summary>
+    /// 尝试对目标造成伤害（统一的伤害检测方法）
+    /// 返回是否成功造成伤害
+    /// </summary>
+    protected bool TryDealDamage(Collider2D other, int damage)
+    {
+        // 检查是否在目标层
+        if (!IsValidTarget(other.gameObject)) return false;
+        
+        // 获取目标鱼
+        BaseFish targetFish = other.GetComponent<BaseFish>();
+        if (targetFish == null) return false;
+        
+        // 不能攻击自己
+        if (targetFish == this) return false;
+        
+        // 不能攻击无敌目标
+        if (targetFish.IsInvincible) return false;
+        
+        // 造成伤害
+        targetFish.TakeDamage(damage);
+        
+        // 如果击杀了目标，恢复血量并通知连击系统
+        if (targetFish.CurrentHealth <= 0)
+        {
+            RestoreHealth(1);
+            ComboSystem.Instance?.OnEnemyKilled();
+        }
+        
+        return true;
+    }
+    
+    /// <summary>
+    /// 范围伤害检测（用于Pufferfish、Tuna等范围攻击）
+    /// </summary>
+    protected void DealDamageInRadius(Vector3 center, float radius, int damage)
+    {
+        Collider2D[] hits = Physics2D.OverlapCircleAll(center, radius, targetLayer);
+        
+        foreach (var hit in hits)
+        {
+            TryDealDamage(hit, damage);
+        }
     }
     
     /// <summary>

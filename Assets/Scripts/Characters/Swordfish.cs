@@ -44,9 +44,6 @@ public class Swordfish : BaseFish
     [Header("Movement")]
     private int lastInputBeat = -1;
     
-    [Header("Visual")]
-    [SerializeField] private LayerMask enemyLayer = -1;
-    
     // 公开属性
     public bool IsParrying => isParrying;
     public bool CanParry => canParry;
@@ -127,17 +124,10 @@ public class Swordfish : BaseFish
         // 只在idle状态（最高速、非格挡、非反击）处理
         if (currentSpeed < MaxSpeedLevel || isParrying || isCounterAttacking) return;
         
-        BaseFish targetFish = other.GetComponent<BaseFish>();
-        if (targetFish != null && !targetFish.IsPlayer && targetFish != this && !targetFish.IsInvincible)
+        // 使用基类的统一伤害检测方法
+        if (TryDealDamage(other, noseDamage))
         {
-            targetFish.TakeDamage(noseDamage);
-            Debug.Log($"Swordfish nose hit {targetFish.gameObject.name}!");
-            
-            if (targetFish.CurrentHealth <= 0)
-            {
-                RestoreHealth(1);
-                ComboSystem.Instance?.OnEnemyKilled();
-            }
+            Debug.Log($"Swordfish nose hit {other.gameObject.name}!");
         }
     }
     
@@ -149,17 +139,10 @@ public class Swordfish : BaseFish
         // 只在反击状态处理
         if (!isCounterAttacking) return;
         
-        BaseFish targetFish = other.GetComponent<BaseFish>();
-        if (targetFish != null && !targetFish.IsPlayer && targetFish != this && !targetFish.IsInvincible)
+        // 使用基类的统一伤害检测方法
+        if (TryDealDamage(other, counterDamage))
         {
-            targetFish.TakeDamage(counterDamage);
-            Debug.Log($"Swordfish counter hit {targetFish.gameObject.name}!");
-            
-            if (targetFish.CurrentHealth <= 0)
-            {
-                RestoreHealth(1);
-                ComboSystem.Instance?.OnEnemyKilled();
-            }
+            Debug.Log($"Swordfish counter hit {other.gameObject.name}!");
         }
     }
     

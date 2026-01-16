@@ -33,9 +33,6 @@ public class Pufferfish : BaseFish
     private Vector3 originalScale;
     private Tweener currentScaleTween;
     
-    [Header("Visual")]
-    [SerializeField] private LayerMask enemyLayer = -1;
-    
     // 公开属性供PlayerController使用
     public bool IsInflated => isInflated;
     public bool CanDeflate => canDeflate;
@@ -167,28 +164,8 @@ public class Pufferfish : BaseFish
         // 使用当前攻击等级的范围
         float attackRange = attackRanges[currentAttackLevel - 1];
         
-        // 检测范围内的所有碰撞体
-        Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, attackRange, enemyLayer);
-        
-        foreach (var hit in hits)
-        {
-            BaseFish targetFish = hit.GetComponent<BaseFish>();
-            if (targetFish != null && !targetFish.IsPlayer && targetFish != this)
-            {
-                // 检查敌人是否无敌（避免同一拍内重复伤害）
-                if (!targetFish.IsInvincible)
-                {
-                    targetFish.TakeDamage(attackDamage);
-                    Debug.Log($"Pufferfish hit {targetFish.gameObject.name} at level {currentAttackLevel}!");
-                    
-                    if (targetFish.CurrentHealth <= 0)
-                    {
-                        RestoreHealth(1);
-                        ComboSystem.Instance?.OnEnemyKilled();
-                    }
-                }
-            }
-        }
+        // 使用基类的范围伤害检测方法
+        DealDamageInRadius(transform.position, attackRange, attackDamage);
     }
     
     /// <summary>
@@ -215,22 +192,10 @@ public class Pufferfish : BaseFish
         // 只在膨胀状态处理碰撞
         if (!isInflated) return;
         
-        // 检查是否在敌人层
-        if (((1 << other.gameObject.layer) & enemyLayer) == 0) return;
-        
-        // 检查是否为敌人角色
-        BaseFish targetFish = other.GetComponent<BaseFish>();
-        if (targetFish != null && !targetFish.IsPlayer && targetFish != this)
+        // 使用基类的统一伤害检测方法
+        if (TryDealDamage(other, attackDamage))
         {
-            targetFish.TakeDamage(attackDamage);
-            
-            Debug.Log($"Pufferfish hit {targetFish.gameObject.name}!");
-            
-            if (targetFish.CurrentHealth <= 0)
-            {
-                RestoreHealth(1);
-                ComboSystem.Instance?.OnEnemyKilled();
-            }
+            Debug.Log($"Pufferfish hit {other.gameObject.name}!");
         }
     }
     

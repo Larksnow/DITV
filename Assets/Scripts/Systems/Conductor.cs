@@ -75,6 +75,14 @@ public class Conductor : MonoBehaviour
     {
         if (listeners.Contains(listener)) listeners.Remove(listener);
     }
+    
+    /// <summary>
+    /// 检查监听者是否已注册
+    /// </summary>
+    public bool IsListenerRegistered(IBeatListener listener)
+    {
+        return listeners.Contains(listener);
+    }
 
     // --- 核心判定逻辑 ---
     

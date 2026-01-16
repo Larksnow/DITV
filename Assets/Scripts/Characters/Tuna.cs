@@ -24,9 +24,6 @@ public class Tuna : BaseFish
     private Vector3 originalScale;
     private float targetScaleMultiplier = 1f;
     
-    [Header("Visual")]
-    [SerializeField] private LayerMask enemyLayer = -1;
-    
     // 公开属性供PlayerController使用
     public bool IsCharging => isCharging;
     public bool IsDashing => isDashing;
@@ -180,22 +177,8 @@ public class Tuna : BaseFish
     /// </summary>
     private void CheckDashCollision(float damage)
     {
-        Collider2D[] hitColliders = Physics2D.OverlapCircleAll(transform.position, 1f, enemyLayer);
-        
-        foreach (Collider2D collider in hitColliders)
-        {
-            BaseFish targetFish = collider.GetComponent<BaseFish>();
-            if (targetFish != null && !targetFish.IsPlayer && targetFish != this)
-            {
-                targetFish.TakeDamage(Mathf.RoundToInt(damage));
-                
-                if (targetFish.CurrentHealth <= 0)
-                {
-                    RestoreHealth(1);
-                    ComboSystem.Instance?.OnEnemyKilled();
-                }
-            }
-        }
+        // 使用基类的范围伤害检测方法
+        DealDamageInRadius(transform.position, 1f, Mathf.RoundToInt(damage));
     }
     
     /// <summary>
