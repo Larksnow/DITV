@@ -21,6 +21,7 @@ public class Swordfish : BaseFish
     [SerializeField] private int currentSpeed = 0; // 当前速度等级 0-3
     [SerializeField] private int noseDamage = 1;
     [SerializeField] private int counterDamage = 5;
+    [SerializeField] private bool enableNoseDamage = true; // 是否启用嘴尖伤害
     
     [Header("Hitboxes")]
     [SerializeField] private Collider2D noseHitbox; // 最高速时的嘴尖攻击判定（只在idle状态有效）
@@ -39,7 +40,8 @@ public class Swordfish : BaseFish
     [Header("Counter Attack")]
     [SerializeField] private bool isCounterAttacking = false; // 是否正在反击
     [SerializeField] private bool pendingCounterAttack = false; // 是否有待执行的反击
-    [SerializeField] private float counterDashDistance = 5f; // 反击冲刺距离
+    [SerializeField] private float counterDashDistance = 8f; // 反击冲刺距离（增加位移）
+    private Vector3 counterAttackDirection; // 反击方向（格挡成功时锁定）
     
     [Header("Movement")]
     private int lastInputBeat = -1;
@@ -47,6 +49,8 @@ public class Swordfish : BaseFish
     // 公开属性
     public bool IsParrying => isParrying;
     public bool CanParry => canParry;
+    public bool IsCounterAttacking => isCounterAttacking;
+    public bool IsPendingCounterAttack => pendingCounterAttack; // 等待反击中，拒绝输入
     public int CurrentSpeed => currentSpeed;
     public int MaxSpeedLevel => speedLevels.Length - 1; // 最高等级 = 3
     public bool IsMaxSpeed => currentSpeed >= MaxSpeedLevel;
@@ -121,6 +125,9 @@ public class Swordfish : BaseFish
     /// </summary>
     private void HandleNoseHit(Collider2D other)
     {
+        // 检查是否启用嘴尖伤害
+        if (!enableNoseDamage) return;
+        
         // 只在idle状态（最高速、非格挡、非反击）处理
         if (currentSpeed < MaxSpeedLevel || isParrying || isCounterAttacking) return;
         
@@ -148,8 +155,8 @@ public class Swordfish : BaseFish
     
     protected override void HandleFreeMovement()
     {
-        // 反击时不能自由移动
-        if (!isCounterAttacking)
+        // 只有反击时不能自由移动，格挡时保持移动
+        if (!isCounterAttacking && !pendingCounterAttack)
         {
             base.HandleFreeMovement();
         }
@@ -228,7 +235,7 @@ public class Swordfish : BaseFish
             parryHitbox.enabled = true;
         }
         
-        Debug.Log("Swordfish parry activated");
+        Debug.Log("Swordfish parry activated - stopped moving");
         
         // 动画：ideal -> parry (Parrying = true)
         if (animator != null)
@@ -295,7 +302,8 @@ public class Swordfish : BaseFish
             parryCoroutine = null;
         }
         
-        isParrying = false;
+        // 注意：保持 isParrying = true，动画保持在 parry 状态
+        // 直到 PerformCounterAttack() 时才改变动画状态
         
         // 格挡成功，重置CD，可以连续格挡
         parryCooldown = 0;
@@ -307,8 +315,22 @@ public class Swordfish : BaseFish
             parryHitbox.enabled = false;
         }
         
-        // 标记下一拍执行反击
+        // 标记下一拍执行反击（方向会在第二拍开始时锁定）
         pendingCounterAttack = true;
+        
+        // 动画保持在 parry 状态，等待下一拍攻击时再转换
+        
+        Debug.Log("Parry successful! Counter attack will trigger next beat!");
+    }
+    
+    /// <summary>
+    /// 执行反击（在下一拍自动触发）- 使用第二拍开始时的鼠标方向
+    /// </summary>
+    private void PerformCounterAttack()
+    {
+        isCounterAttacking = true;
+        pendingCounterAttack = false;
+        isParrying = false; // 现在才结束格挡状态
         
         // 动画：parry -> attack (Parrying = false, Attacking = true)
         if (animator != null)
@@ -317,16 +339,8 @@ public class Swordfish : BaseFish
             animator.SetBool("Attacking", true);
         }
         
-        Debug.Log("Parry successful! Counter attack will trigger next beat!");
-    }
-    
-    /// <summary>
-    /// 执行反击（在下一拍自动触发）- 朝鼠标方向冲刺
-    /// </summary>
-    private void PerformCounterAttack()
-    {
-        isCounterAttacking = true;
-        pendingCounterAttack = false;
+        // 在第二拍开始时锁定当前鼠标方向
+        counterAttackDirection = GetMouseDirection();
         
         // 启用反击hitbox
         if (counterHitbox != null)
@@ -334,30 +348,28 @@ public class Swordfish : BaseFish
             counterHitbox.enabled = true;
         }
         
-        // 设置无敌帧
+        // 设置无敌帧（整个冲刺过程）
         SetInvincible(true);
         
-        // 朝鼠标方向冲刺
-        Vector3 dashDirection = GetMouseDirection();
-        Vector3 targetPosition = transform.position + dashDirection * counterDashDistance;
+        // 使用锁定的方向冲刺
+        Vector3 targetPosition = transform.position + counterAttackDirection * counterDashDistance;
         targetPosition = ClampToScreenBounds(targetPosition);
         
-        float dashDuration = Conductor.Instance != null ? Conductor.Instance.BeatsToSeconds(1f) : 0.5f;
+        float dashDuration = Conductor.Instance != null ? Conductor.Instance.BeatsToSeconds(0.5f) : 0.25f;
         movementController.SetTargetPosition(targetPosition, dashDuration);
         
         Debug.Log($"Counter attack executed towards mouse direction!");
         
-        // 反击持续一拍后结束
-        StartCoroutine(EndCounterAttackAfterBeat());
+        // 反击持续半拍后结束
+        StartCoroutine(EndCounterAttackAfterBeat(dashDuration));
     }
     
     /// <summary>
     /// 反击结束协程
     /// </summary>
-    private IEnumerator EndCounterAttackAfterBeat()
+    private IEnumerator EndCounterAttackAfterBeat(float duration)
     {
-        float beatDuration = Conductor.Instance != null ? Conductor.Instance.BeatsToSeconds(1f) : 0.5f;
-        yield return new WaitForSeconds(beatDuration);
+        yield return new WaitForSeconds(duration);
         
         isCounterAttacking = false;
         
@@ -446,24 +458,8 @@ public class Swordfish : BaseFish
             return;
         }
         
-        // 正常受伤
+        // 正常受伤（不影响速度）
         base.TakeDamage(damage);
-        
-        // 受伤时速度重置
-        UpdateSpeed(0);
-        canParry = false;
-        pendingCounterAttack = false;
-        
-        // 禁用所有hitbox
-        if (noseHitbox != null) noseHitbox.enabled = false;
-        if (counterHitbox != null) counterHitbox.enabled = false;
-        if (parryHitbox != null) parryHitbox.enabled = false;
-        
-        if (animator != null)
-        {
-            animator.SetBool("Attacking", false);
-            animator.SetBool("Parrying", false);
-        }
     }
     
     /// <summary>
@@ -541,11 +537,18 @@ public class Swordfish : BaseFish
             Gizmos.DrawWireSphere(transform.position, 2f);
         }
         
-        // 待反击指示（显示冲刺方向）
+        // 待反击指示（显示当前鼠标方向，因为方向会在第二拍开始时锁定）
         if (pendingCounterAttack)
         {
             Gizmos.color = Color.yellow;
             Gizmos.DrawRay(transform.position, GetMouseDirection() * counterDashDistance);
+        }
+        
+        // 反击中指示（显示锁定的冲刺方向）
+        if (isCounterAttacking)
+        {
+            Gizmos.color = Color.red;
+            Gizmos.DrawRay(transform.position, counterAttackDirection * counterDashDistance);
         }
     }
 }

@@ -255,7 +255,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f591594c003ba1e4bafcf1fabe00e471, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  maxHealth: 3
+  maxHealth: 5
   currentHealth: 0
   isInvincible: 0
   isPlayer: 1
@@ -275,6 +275,7 @@ MonoBehaviour:
   currentSpeed: 0
   noseDamage: 1
   counterDamage: 5
+  enableNoseDamage: 0
   noseHitbox: {fileID: 573397211972515390}
   counterHitbox: {fileID: 2308614248752154191}
   parryHitbox: {fileID: 1912495754525607368}

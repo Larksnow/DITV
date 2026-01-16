@@ -214,6 +214,16 @@ public class PlayerController : MonoBehaviour, IBeatListener
             return;
         }
         
+        // 剑鱼等待反击或正在反击时，拒绝所有输入
+        if (currentFish is Swordfish swordfish)
+        {
+            if (swordfish.IsPendingCounterAttack || swordfish.IsCounterAttacking)
+            {
+                Debug.Log("Input blocked - swordfish is in counter attack phase");
+                return;
+            }
+        }
+        
         // 检查节拍时机
         if (Conductor.Instance != null && Conductor.Instance.CheckInputTiming())
         {
@@ -334,6 +344,12 @@ public class PlayerController : MonoBehaviour, IBeatListener
                 break;
                 
             case Swordfish swordfish:
+                // 剑鱼等待反击或正在反击时，拒绝所有输入
+                if (swordfish.IsPendingCounterAttack || swordfish.IsCounterAttacking)
+                {
+                    return;
+                }
+                
                 // 剑鱼的格挡操作（需要节拍判定，且只有最高速+CD结束时才能格挡）
                 if (Input.GetKeyDown(secondaryKey) && !isPunished)
                 {
